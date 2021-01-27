@@ -351,7 +351,7 @@ def render(template='', data={}, partials_path='.', partials_ext='mustache',
                 # then remove the spaces from the end
                 part_out = part_out.rstrip(' \t')
 
-            # Add the partials output to the ouput
+            # Add the partials output to the output
             output += part_out
 
     return output

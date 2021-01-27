@@ -117,11 +117,12 @@ def process_section(section_data):
 
 
 def build_html_output(file_path):
+    data = {'mustache': 'World'}
     with open('template.mustache', 'r') as f:
-        render(
-            template=f,
-            data={'mustache': 'World'}
-        )
+        html = render(template=f, data=data)
+
+    with open(file_path, 'w') as fp:
+        fp.write(html)
 
 
 def main(args):
