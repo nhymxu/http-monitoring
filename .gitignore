@@ -128,5 +128,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Jetbrains project settings
+.idea
+tmp/*
+!tmp/.gitkeep
+
 # Self-project setting
 config.ini

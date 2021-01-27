@@ -1,48 +1,44 @@
 # -*- coding: utf-8 -*-
 
 """
-Dynamic DNS record update utility for CloudFlare DNS service.
+HTTP(s) monitoring webpage.
 (c) Dung Nguyen (nhymxu)
 https://www.journaldev.com/23494/python-string-templateÍ
 """
 
 import argparse
 import json
+from configparser import ConfigParser
+from os import path
 import urllib.error
 import urllib.parse
 import urllib.request
-from configparser import ConfigParser
-from os import path
+from hashlib import md5
+from datetime import datetime
+from chevron.renderer import render
 
 
-CF_API_TOKEN = ''
-IS_DRYRUN = False
+COMMON_CONFIG = []
+TMP_RESULT = {
+    'success': [],
+    'failed': []
+}
 
 
-def _make_request(method="GET", url="", request_body=None):
+def make_request(url="", method="GET"):
     """
     Send API request ( json type )
 
-    :param method:
     :param url:
-    :param request_body:
+    :param method:
     :return:
     """
-    headers = {
-        'Authorization': "Bearer {}".format(CF_API_TOKEN),
-        'Content-Type': 'application/json'
-    }
-
-    data = None
-    if request_body:
-        # data = urllib.parse.urlencode(request_body)
-        data = request_body.encode('ascii')
 
     try:
-        req = urllib.request.Request(url, headers=headers, data=data, method=method)
+        req = urllib.request.Request(url)
         with urllib.request.urlopen(req) as response:
-            resp_content = response.read()
-            return resp_content
+            resp_code = response.getcode()
+            return resp_code
     except urllib.error.HTTPError as e:
         print(e.code)
         print(e.read())
@@ -55,11 +51,10 @@ def _make_request(method="GET", url="", request_body=None):
 def get_config(config_path='config.ini'):
     """
     Read and parsing config from ini file.
-    Set global var CF_API_TOKEN
 
     :return:
     """
-    global CF_API_TOKEN
+    global COMMON_CONFIG
 
     if not path.exists(config_path):
         raise RuntimeError("config file not found")
@@ -70,18 +65,31 @@ def get_config(config_path='config.ini'):
     if "common" not in config:
         raise Exception("Common config not found.")
 
-    if "CF_API_TOKEN" not in config['common'] or not config['common']['CF_API_TOKEN']:
-        raise Exception("Missing CloudFlare API Token on config file")
-
-    CF_API_TOKEN = config['common']['CF_API_TOKEN']
+    COMMON_CONFIG = config['common']
 
     config_sections = config.sections()
     config_sections.remove("common")
 
     if not config_sections:
-        raise Exception("Empty site to update DNS")
+        raise Exception("Empty site to check")
 
     return config, config_sections
+
+
+def write_to_file(url, display, is_valid):
+    file_name = path.join(
+        'tmp',
+        '{}_{}.json'.format(is_valid, md5(url.encode('utf-8')).hexdigest())
+    )
+    data = {
+        'title': display,
+        'url': url,
+        'is_valid': is_valid,
+        'check_time': datetime.now()
+    }
+
+    with open(file_name, 'w') as fp:
+        fp.write(json.dumps(data, indent=2))
 
 
 def process_section(section_data):
@@ -91,20 +99,29 @@ def process_section(section_data):
     :param section_data:
     :return:
     """
-    base_domain = section_data["base_domain"].strip()
-    record_list = section_data["records"].strip().split("|")
+    url = section_data["url"].strip()
+    display = section_data.get("display", url).strip()
+    expected_code = section_data["expected_http_code"]
 
-    for record in record_list:
-        record = record.strip()
-        dns_record = base_domain
-        if record != '@':
-            dns_record = "{}.{}".format(record, base_domain)
+    resp_code = make_request(url)
 
-        if IS_DRYRUN:
-            print("[DRY RUN] Update record `{}` in zone id `{}`".format(dns_record, section_data['zone_id']))
-            continue
+    valid = 1
+    if not resp_code or expected_code != resp_code:
+        valid = 0
 
-        update_host(section_data['zone_id'], dns_record, public_ip)
+    write_to_file(
+        url=url,
+        display=display,
+        is_valid=valid
+    )
+
+
+def build_html_output(file_path):
+    with open('template.mustache', 'r') as f:
+        render(
+            template=f,
+            data={'mustache': 'World'}
+        )
 
 
 def main(args):
@@ -120,25 +137,27 @@ def main(args):
         print("")
         print("--- Checking {} ---".format(section))
 
-        if "base_domain" not in config[section] or not config[section]["base_domain"]:
-            print("Not found `base_domain` config on section `{}`".format(section))
+        if "url" not in config[section] or not config[section]["url"]:
+            print("Not found `url` config on section `{}`".format(section))
             continue
 
-        if "records" not in config[section] or not config[section]["records"]:
-            print("Not found `records` config on section `{}`".format(section))
+        if "expected_http_code" not in config[section] or not config[section]["expected_http_code"]:
+            print("Not found `expected_http_code` config on section `{}`".format(section))
             continue
 
         process_section(section_data=config[section])
+
+    build_html_output(file_path=args.output)
 
 
 if __name__ == "__main__":
     nx_parser = argparse.ArgumentParser(
         prog='monitor',
-        usage='%(prog)s [options] --config config_path',
+        usage='%(prog)s [options] --config config_path --output output_path',
         description='HTTP monitoring.'
     )
     nx_parser.add_argument('--config', action='store', type=str, default='config.ini')
-    nx_parser.add_argument('--output', action='store', type=str, default='')
+    nx_parser.add_argument('--output', action='store', type=str, default='index.html')
 
     input_args = nx_parser.parse_args()
 
