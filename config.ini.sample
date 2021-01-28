@@ -1,0 +1,17 @@
+[DEFAULT]
+; How many curl checks to run at the same time
+max_concurrent_thread = 12
+; Max timeout of a check in seconds
+request_timeout = 10
+; of retries per url (only retries if it fails).
+request_retries = 1
+; After how many seconds should we re-check any failed checks? (To prevent flapping)
+flap_retry = 5
+; Status code that will be validated against response status code (this is, mostly, what makes a check go either green or red).
+expected_http_code = 200
+
+[google-test-section]
+; Display name in the website (Maybe you want to see "My website" instead of "http://yourwebsite.com").
+display = Google
+; URL to check (ex: "google.com").
+url = https://google.com.vn
