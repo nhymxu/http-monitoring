@@ -18,10 +18,9 @@ from datetime import datetime
 from chevron.renderer import render
 
 
-COMMON_CONFIG = []
 TMP_RESULT = {
     'success': [],
-    'failed': []
+    'failed': {}
 }
 
 
@@ -33,19 +32,19 @@ def make_request(url="", method="GET"):
     :param method:
     :return:
     """
-
     try:
         req = urllib.request.Request(url)
         with urllib.request.urlopen(req) as response:
             resp_code = response.getcode()
-            return resp_code
+            return resp_code, ''
     except urllib.error.HTTPError as e:
         print(e.code)
         print(e.read())
+        return e.code, e.reason
     except urllib.error.URLError as e:
-        print(e.reason)
+        return 0, e.reason
 
-    return False
+    return 0, ''
 
 
 def get_config(config_path='config.ini'):
@@ -62,34 +61,12 @@ def get_config(config_path='config.ini'):
     config = ConfigParser()
     config.read(config_path)
 
-    if "common" not in config:
-        raise Exception("Common config not found.")
-
-    COMMON_CONFIG = config['common']
-
     config_sections = config.sections()
-    config_sections.remove("common")
 
     if not config_sections:
         raise Exception("Empty site to check")
 
     return config, config_sections
-
-
-def write_to_file(url, display, is_valid):
-    file_name = path.join(
-        'tmp',
-        '{}_{}.json'.format(is_valid, md5(url.encode('utf-8')).hexdigest())
-    )
-    data = {
-        'title': display,
-        'url': url,
-        'is_valid': is_valid,
-        'check_time': datetime.now()
-    }
-
-    with open(file_name, 'w') as fp:
-        fp.write(json.dumps(data, indent=2))
 
 
 def process_section(section_data):
@@ -99,26 +76,47 @@ def process_section(section_data):
     :param section_data:
     :return:
     """
+    global TMP_RESULT
+
     url = section_data["url"].strip()
     display = section_data.get("display", url).strip()
-    expected_code = section_data["expected_http_code"]
+    expected_code = section_data.getint('expected_http_code')
 
-    resp_code = make_request(url)
+    url_hash = md5(url.encode('utf-8')).hexdigest()
+    retry_attempt = 0
+    if url_hash in TMP_RESULT['failed']:
+        retry_attempt += 1
 
-    valid = 1
+    start_time = datetime.now()
+    resp_code, msg = make_request(url)
+    end_time = datetime.now()
+
+    duration = end_time - start_time
+    elapsed_seconds = round(duration.microseconds * .000001, 6)
+
+    result = {
+        'name': display,
+        'url': url,
+        'duration': duration,
+        'elapsed_seconds': elapsed_seconds,
+        'actual_status': resp_code,
+        'expected_status': expected_code,
+        'time_check': end_time,
+        'error': msg,
+        'retry_attempt': retry_attempt
+    }
+
     if not resp_code or expected_code != resp_code:
-        valid = 0
+        if resp_code and msg == '':
+            result['error'] = 'Status code does not match expected code'
 
-    write_to_file(
-        url=url,
-        display=display,
-        is_valid=valid
-    )
+        TMP_RESULT['failed'][url_hash] = result
+    else:
+        TMP_RESULT['success'].append(result)
 
 
 def build_html_output(file_path):
     data = {
-        'page_title': 'World',
         'has_failed': True,
         'fail_count': 1,
         'check_date': '2021-01-20',
@@ -129,14 +127,16 @@ def build_html_output(file_path):
                 'url': 'https://google.com',
                 'expected_status': 200,
                 'actual_status': 500,
-                'error': 'xxx'
+                'error': 'xxx',
+                'duration': 200,
             },
             {
                 'name': 'Google CN',
                 'url': 'https://google.cn',
                 'expected_status': 200,
                 'actual_status': 500,
-                'error': 'Status code does not match expected code'
+                'error': 'Status code does not match expected code',
+                'duration': 200,
             }
         ],
         'sites_success': [
@@ -169,6 +169,8 @@ def main(args):
     """
     config, config_sections = get_config(config_path=args.config)
 
+    max_concurrent_thread = config['DEFAULT']['max_concurrent_thread']
+
     for section in config_sections:
         print("")
         print("--- Checking {} ---".format(section))
@@ -183,7 +185,8 @@ def main(args):
 
         process_section(section_data=config[section])
 
-    build_html_output(file_path=args.output)
+    print(TMP_RESULT)
+    # build_html_output(file_path=args.output)
 
 
 if __name__ == "__main__":
