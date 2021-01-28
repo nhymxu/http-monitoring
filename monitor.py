@@ -117,7 +117,42 @@ def process_section(section_data):
 
 
 def build_html_output(file_path):
-    data = {'mustache': 'World'}
+    data = {
+        'page_title': 'World',
+        'has_failed': True,
+        'fail_count': 1,
+        'check_date': '2021-01-20',
+        'total_durations': 1000,
+        'sites_error': [
+            {
+                'name': 'Google',
+                'url': 'https://google.com',
+                'expected_status': 200,
+                'actual_status': 500,
+                'error': 'xxx'
+            },
+            {
+                'name': 'Google CN',
+                'url': 'https://google.cn',
+                'expected_status': 200,
+                'actual_status': 500,
+                'error': 'Status code does not match expected code'
+            }
+        ],
+        'sites_success': [
+            {
+                'name': 'Google VN',
+                'url': 'https://google.com.vn',
+                'duration': 200,
+            },
+            {
+                'name': 'DungNT',
+                'url': 'https://dungnt.net',
+                'duration': 400,
+            }
+        ]
+    }
+
     with open('template.mustache', 'r') as f:
         html = render(template=f, data=data)
 

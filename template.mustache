@@ -4,7 +4,7 @@
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css" integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous">
-	<title{{ page_title }}</title>
+	<title>{{ page_title }}</title>
 </head>
 <body>
 <div class=container>
@@ -17,7 +17,7 @@
 	<div class=row>
 		<div class=col>
 	  		{{#has_failed}}
-	    	<div class="alert alert-danger" role="alert">Errors occured! ${failCount} check(s) have failed.</div>
+	    	<div class="alert alert-danger" role="alert">Errors occured! {{fail_count}} check(s) have failed.</div>
 			<table class="table">
 	    		<thead>
 	    			<tr>
@@ -27,13 +27,13 @@
 	    			</tr>
 	    		</thead>
 	    		<tbody>
-	    			<!-- for each failed -->
+	    			{{#sites_error}}
 	    			<tr class='table-danger'>
-	    				<td>${filenameWithoutExt}</td>
-	    				<td>${status} / </td>
-	    				<td>${curlError} or Status code does not match expected code</td>
+	    				<td>{{url}}</td>
+	    				<td>{{actual_status}} / {{expected_status}}</td>
+	    				<td>{{error}}</td>
 	    			</tr>
-	    			<!-- end for -->
+                    {{/sites_error}}
 					<tr>
 						<td colspan=3 class='small'>All failed checks were attempted again after ${flapRetry} seconds and failed again.</td>
 					</tr>
@@ -49,12 +49,12 @@
 
 	<div class=row>
 		<div class=col>
-			<!-- for each success -->
+			{{#sites_success}}
 	        <a href="#" class="btn btn-success disabled" tabindex="-1" role="button" aria-disabled="true" style="margin-top: 10px; padding: 10px;">
-	        	${filenameWithoutExt}
-	        	<span style="color: LightGray; "> ("${value}" ms)</span>
-	        </a> &nbsp;"
-	        <!-- end for -->
+	        	{{name}}
+	        	<span style="color: LightGray;"> ({{duration}} ms)</span>
+	        </a> &nbsp;
+            {{/sites_success}}
 		</div>
 	</div>
 
@@ -64,7 +64,7 @@
 		<div class=col>
 			<p class=small>
 				Last check: {{check_date}}
-				<br>Total duration: {{total_duration}} ms
+				<br>Total duration: {{total_durations}} ms
 				<br>Monitoring script by <a href='https://dungnt.net'>Dung Nguyen (nhymxu)</a>.
 				<a href='https://github.com/nhymxu/http-monitoring'>Source code</a>
 			</p>
