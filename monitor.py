@@ -91,14 +91,12 @@ def process_section(section_data):
     resp_code, msg = make_request(url)
     end_time = datetime.now()
 
-    duration = end_time - start_time
-    elapsed_seconds = round(duration.microseconds * .000001, 6)
+    duration_ms = (end_time - start_time).microseconds
 
     result = {
         'name': display,
         'url': url,
-        'duration': duration,
-        'elapsed_seconds': elapsed_seconds,
+        'duration': duration_ms,
         'actual_status': resp_code,
         'expected_status': expected_code,
         'time_check': end_time,
@@ -117,41 +115,30 @@ def process_section(section_data):
 
 def build_html_output(file_path):
     data = {
-        'has_failed': True,
-        'fail_count': 1,
-        'check_date': '2021-01-20',
-        'total_durations': 1000,
-        'sites_error': [
-            {
-                'name': 'Google',
-                'url': 'https://google.com',
-                'expected_status': 200,
-                'actual_status': 500,
-                'error': 'xxx',
-                'duration': 200,
-            },
-            {
-                'name': 'Google CN',
-                'url': 'https://google.cn',
-                'expected_status': 200,
-                'actual_status': 500,
-                'error': 'Status code does not match expected code',
-                'duration': 200,
-            }
-        ],
-        'sites_success': [
-            {
-                'name': 'Google VN',
-                'url': 'https://google.com.vn',
-                'duration': 200,
-            },
-            {
-                'name': 'DungNT',
-                'url': 'https://dungnt.net',
-                'duration': 400,
-            }
-        ]
+        'check_date': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        'sites_error': [],
+        'sites_success': [],
+        'has_failed': False,
+        'fail_count': 0,
+        'total_durations': 0,
     }
+
+    total_durations = 0
+
+    if len(TMP_RESULT['failed']):
+        data['has_failed'] = True
+        data['fail_count'] = len(TMP_RESULT['failed'])
+
+        for _, site in TMP_RESULT['failed'].items():
+            total_durations += site['duration']
+            data['sites_error'].append(site)
+
+    for site in TMP_RESULT['success']:
+        total_durations += site['duration']
+        data['sites_success'].append(site)
+
+    data['total_durations'] = round(total_durations * .001, 6)
+    elapsed_seconds = round(total_durations * .000001, 6)
 
     with open('template.mustache', 'r') as f:
         html = render(template=f, data=data)
@@ -185,8 +172,7 @@ def main(args):
 
         process_section(section_data=config[section])
 
-    print(TMP_RESULT)
-    # build_html_output(file_path=args.output)
+    build_html_output(file_path=args.output)
 
 
 if __name__ == "__main__":
